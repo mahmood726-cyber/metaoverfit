@@ -18,14 +18,17 @@ r2het(yi, vi, mods = NULL, data = NULL, method = "REML")
 \item{method}{Heterogeneity estimator (default: "REML").}
 }
 \value{
-A list with elements:
+A list with class "r2het" containing:
 \itemize{
-  \item \code{r2het} Apparent R^2_het.
-  \item \code{r2het_adj} Adjusted R^2_het with small-sample penalty.
-  \item \code{tau2_null}, \code{tau2_full} Estimated tau^2 from null and full models.
-  \item \code{I2} I^2 from the null model.
-  \item \code{k}, \code{p} Number of studies and parameters.
-  \item \code{model_null}, \code{model_full} \code{metafor::rma} fits.
+  \item \code{r2het} Apparent R^2_het (numeric).
+  \item \code{r2het_adj} Adjusted R^2_het with small-sample penalty (numeric).
+  \item \code{tau2_null} Estimated tau^2 from null model (numeric).
+  \item \code{tau2_full} Estimated tau^2 from full model (numeric).
+  \item \code{I2} I^2 from the null model (numeric).
+  \item \code{k} Number of studies (integer).
+  \item \code{p} Number of parameters (integer).
+  \item \code{model_null} \code{metafor::rma} fit for null model.
+  \item \code{model_full} \code{metafor::rma} fit for full model.
 }
 }
 \description{

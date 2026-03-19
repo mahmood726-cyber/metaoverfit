@@ -9,8 +9,21 @@
 Tools for detecting and correcting overfitting in meta-regression analyses
 through cross-validation and bootstrap methods.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/mahmood726-cyber/metaoverfit}
+  \item Report bugs at \url{https://github.com/mahmood726-cyber/metaoverfit/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Mahmood Ahmad \email{mahmood.ahmad2@nhs.net}
+
+Authors:
+\itemize{
+  \item Laiba Khan \email{drlaiba999@gmail.com}
+}
 
 }
 \keyword{internal}

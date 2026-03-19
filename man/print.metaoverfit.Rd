@@ -7,9 +7,12 @@
 \method{print}{metaoverfit}(x, ...)
 }
 \arguments{
-\item{x}{metaoverfit object.}
+\item{x}{A metaoverfit object.}
 
 \item{...}{Additional arguments (unused).}
+}
+\value{
+No return value, called for side effects (printing to console).
 }
 \description{
 Print Method for metaoverfit Objects

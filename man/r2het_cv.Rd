@@ -33,16 +33,31 @@ r2het_cv(
 \item{verbose}{Show progress bar.}
 }
 \value{
-List containing apparent/corrected R^2_het, optimism, diagnostics, and predictions.
+A list with class "r2het_cv" containing:
+\itemize{
+  \item \code{r2het_apparent} Apparent R^2_het (numeric).
+  \item \code{r2het_corrected} Cross-validated R^2_het (numeric).
+  \item \code{optimism} Difference between apparent and corrected (numeric).
+  \item \code{tau2_null} Tau^2 from null model (numeric).
+  \item \code{tau2_cv} Cross-validated tau^2 estimate (numeric).
+  \item \code{convergence_rate} Percentage of successful CV folds (numeric).
+  \item \code{rmse} Root mean squared error of predictions (numeric).
+  \item \code{mae} Mean absolute error of predictions (numeric).
+  \item \code{correlation} Correlation between observed and predicted (numeric).
+  \item \code{predictions} Vector of cross-validated predictions.
+  \item \code{yi} Original effect sizes for reference.
+}
 }
 \description{
 Cross-Validated R-squared for Heterogeneity
 }
 \examples{
+\donttest{
 k <- 30
 yi <- rnorm(k, 0, sqrt(0.1))
 vi <- runif(k, 0.01, 0.1)
 mods <- cbind(1, rnorm(k))
-result <- r2het_cv(yi, vi, mods)
+result <- r2het_cv(yi, vi, mods, verbose = FALSE)
 round(result$optimism * 100, 1)
+}
 }

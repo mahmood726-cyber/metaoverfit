@@ -1,0 +1,2 @@
+"k","p","r2_het_apparent","r2_het_adjusted","r2_het_corrected_cv","optimism","cv_convergence_pct","ci_corrected_lo","ci_corrected_hi","cv_method","k_folds","B_boot"
+13,2,0.756244783614905,0.734085218488987,0.168127253267205,0.5881175303477,100,0,0.870806338063627,"loo",NA,1000

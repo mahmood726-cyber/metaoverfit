@@ -10,11 +10,22 @@ plot_overfitting(result, type = "bar")
 \item{result}{Output from \code{check_overfitting()} or \code{r2het_cv()}.}
 
 \item{type}{"bar" for comparison of apparent vs corrected R^2_het,
-or "scatter" for observed vs predicted (requires predictions).}
+"scatter" for observed vs predicted (requires predictions), or
+"density" for bootstrap distributions (requires bootstrap_values).}
 }
 \value{
-A ggplot object.
+A ggplot2 object. If ggplot2 is not installed, the function
+  will stop with an error message.
 }
 \description{
-Plot Overfitting Diagnostics
+Creates diagnostic plots for assessing overfitting in meta-regression.
+}
+\examples{
+\donttest{
+data(dat.bcg, package = "metadat")
+dat <- metafor::escalc(measure = "RR", ai = tpos, bi = tneg,
+                       ci = cpos, di = cneg, data = dat.bcg)
+cv <- r2het_cv(dat$yi, dat$vi, mods = ~ ablat, data = dat)
+plot_overfitting(cv, type = "bar")
+}
 }

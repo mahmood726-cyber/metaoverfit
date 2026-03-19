@@ -1,0 +1,175 @@
+
+R version 4.5.2 (2025-10-31 ucrt) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # ============================================================================
+> # metaoverfit Quick Simulation Test - 100 Iterations (for testing)
+> # ============================================================================
+> # This is a fast version of the simulation study for quick validation.
+> # Runs 100 iterations instead of 1000.
+> #
+> # Run this first to verify the code works before running the full study.
+> # ============================================================================
+> 
+> # Set library path for data.table
+> .libPaths("C:/Users/user/AppData/Local/R/win-library/4.5")
+> 
+> # Load required packages
+> library(metafor)
+Loading required package: Matrix
+Loading required package: metadat
+Loading required package: numDeriv
+
+Loading the 'metafor' package (version 4.8-0). For an
+introduction to the package please type: help(metafor)
+
+> library(data.table)
+> 
+> # Load metaoverfit from source (not installed as a package)
+> setwd("C:/Users/user/OneDrive - NHS/Documents/metaoverfit")
+> devtools::load_all(".")
+ℹ Loading metaoverfit
+> 
+> # Set seed
+> set.seed(12345)
+> 
+> # Quick configuration
+> N_SIM <- 100  # Quick test version
+> OUTPUT_DIR <- "C:/Users/user/OneDrive - NHS/Documents/metaoverfit/validation/simulation_results"
+> 
+> # Create output directory
+> dir.create(OUTPUT_DIR, showWarnings = FALSE, recursive = TRUE)
+> 
+> # ============================================================================
+> # Test Scenarios (Edge Cases)
+> # ============================================================================
+> 
+> test_scenarios <- data.frame(
++   scenario_id = 1:8,
++   k = c(5, 10, 15, 20, 10, 10, 30, 50),
++   p = c(2, 2, 2, 2, 3, 2, 2, 2),
++   tau2 = c(0.05, 0.05, 0.05, 0, 0.05, 0.1, 0.05, 0.05),
++   beta_mod = c(0.3, 0.3, 0.3, 0.3, 0, 0.3, 0.3, 0.3)  # 0 = null scenario
++ )
+> 
+> cat("Quick Test Scenarios:\n")
+Quick Test Scenarios:
+> print(test_scenarios)
+  scenario_id  k p tau2 beta_mod
+1           1  5 2 0.05      0.3
+2           2 10 2 0.05      0.3
+3           3 15 2 0.05      0.3
+4           4 20 2 0.00      0.3
+5           5 10 3 0.05      0.0
+6           6 10 2 0.10      0.3
+7           7 30 2 0.05      0.3
+8           8 50 2 0.05      0.3
+> 
+> # ============================================================================
+> # Helper Functions
+> # ============================================================================
+> 
+> generate_sim_data <- function(k, tau2, beta_mod, p) {
++   vi <- runif(k, 0.01, 0.1)
++ 
++   if (p == 2) {
++     mods <- cbind(1, rnorm(k, 0, 1))
++     beta <- c(0, beta_mod)
++   } else {
++     mods <- cbind(1, rnorm(k, 0, 1), rnorm(k, 0, 1))
++     beta <- c(0, beta_mod, 0)
++   }
++ 
++   ui <- rnorm(k, 0, sqrt(tau2))
++   yi <- mods %*% beta + ui + rnorm(k, 0, sqrt(vi))
++ 
++   list(yi = as.vector(yi), vi = vi, mods = mods,
++        true_tau2 = tau2, true_beta_mod = beta_mod)
++ }
+> 
+> run_single_sim <- function(sim_data) {
++   tryCatch({
++     check <- suppressWarnings(check_overfitting(
++       yi = sim_data$yi, vi = sim_data$vi, mods = sim_data$mods,
++       B = 50
++     ))
++ 
++     data.frame(
++       k = length(sim_data$yi),
++       p = ncol(sim_data$mods),
++       tau2_true = sim_data$true_tau2,
++       beta_mod_true = sim_data$true_beta_mod,
++       r2_apparent = check$r2het_apparent / 100,
++       r2_corrected = check$r2het_corrected / 100,
++       optimism = check$actual_optimism / 100,
++       convergence = check$convergence_rate,
++       risk_category = check$risk_category,
++       k_per_p = check$k_per_p,
++       status = "success"
++     )
++   }, error = function(e) {
++     data.frame(
++       k = length(sim_data$yi), p = ncol(sim_data$mods),
++       tau2_true = sim_data$true_tau2, beta_mod_true = sim_data$true_beta_mod,
++       r2_apparent = NA_real_, r2_corrected = NA_real_, optimism = NA_real_,
++       convergence = NA_real_, risk_category = NA_character_,
++       k_per_p = NA_real_, status = "error"
++     )
++   })
++ }
+> 
+> # ============================================================================
+> # Run Quick Test
+> # ============================================================================
+> 
+> cat("\n========================================\n")
+
+========================================
+> cat("METAOVERFIT QUICK SIMULATION TEST\n")
+METAOVERFIT QUICK SIMULATION TEST
+> cat("========================================\n\n")
+========================================
+
+> cat(sprintf("Scenarios: %d\n", nrow(test_scenarios)))
+Scenarios: 8
+> cat(sprintf("Iterations per scenario: %d\n", N_SIM))
+Iterations per scenario: 100
+> cat(sprintf("Total simulations: %d\n\n", nrow(test_scenarios) * N_SIM))
+Total simulations: 800
+
+> 
+> all_results <- list()
+> 
+> for (s in 1:nrow(test_scenarios)) {
++   scenario <- test_scenarios[s, ]
++   cat(sprintf("Scenario %d: k=%d, p=%d, tau²=%.2f, beta=%.1f\n",
++               s, scenario$k, scenario$p, scenario$tau2, scenario$beta_mod))
++ 
++   scenario_results <- vector("list", N_SIM)
++ 
++   for (i in 1:N_SIM) {
++     sim_data <- generate_sim_data(scenario$k, scenario$tau2,
++                                    scenario$beta_mod, scenario$p)
++     scenario_results[[i]] <- run_single_sim(sim_data)
++   }
++ 
++   scenario_df <- rbindlist(scenario_results)
++   scenario_df$scenario_id <- s
++   all_results[[s]] <- scenario_df
++ }
+Scenario 1: k=5, p=2, tau²=0.05, beta=0.3

@@ -4,16 +4,31 @@
 \alias{sample_size_recommendation}
 \title{Sample Size Recommendation for Meta-Regression}
 \usage{
-sample_size_recommendation(p, target_optimism = 0.1)
+sample_size_recommendation(p, target_optimism = 0.1, verbose = TRUE)
 }
 \arguments{
 \item{p}{Number of parameters (including intercept).}
 
 \item{target_optimism}{Maximum acceptable optimism (default: 0.10).}
+
+\item{verbose}{Logical. If TRUE (default), prints recommendation to console.}
 }
 \value{
-Invisibly returns the minimum required k; prints a small report.
+An object of class "sample_size_rec" (a list) containing:
+\itemize{
+  \item \code{p} Number of parameters (integer).
+  \item \code{target_optimism} Target optimism level (numeric).
+  \item \code{min_ratio} Minimum k/p ratio required (integer).
+  \item \code{min_k} Minimum number of studies required (integer).
+}
+The object is returned invisibly. When printed, it displays a formatted
+recommendation summary.
 }
 \description{
-Sample Size Recommendation for Meta-Regression
+Calculates the minimum required number of studies for a meta-regression
+analysis based on the number of parameters and target optimism level.
+}
+\examples{
+# Minimum studies for 3-predictor model
+sample_size_recommendation(p = 3, target_optimism = 0.10)
 }

@@ -15,3 +15,9 @@
 
 /doc/
 /Meta/
+.Rproj.user
+inst/doc
+.Rhistory
+.RData
+.Ruserdata
+Rplots.pdf

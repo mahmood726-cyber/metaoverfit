@@ -1,0 +1,100 @@
+---
+title: "Detecting and Correcting Overfitting in Meta-Regression"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Detecting and Correcting Overfitting in Meta-Regression}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(metaoverfit)
+library(metafor)
+```
+
+## Introduction
+
+In meta-regression, the $R^2_{het}$ statistic measures the proportion of between-study variance explained by moderators. However, when the number of studies ($k$) is small, the apparent $R^2_{het}$ can be highly optimistic due to overfitting. The `metaoverfit` package provides tools to estimate and correct for this optimism.
+
+## Quick Start: Checking for Overfitting
+
+The primary tool for diagnosing overfitting is the `check_overfitting()` function. It performs both cross-validation and bootstrap correction in one step.
+
+```{r quick-start}
+set.seed(42)
+
+# Generate a dataset where moderators explain NO true heterogeneity (Null Model)
+k <- 15 # Small number of studies
+p <- 3  # Multiple parameters
+yi <- rnorm(k, 0, sqrt(0.05)) # Random effects
+vi <- runif(k, 0.01, 0.1)     # Sampling variances
+mods <- cbind(1, rnorm(k), rnorm(k)) # Two random moderators + intercept
+
+# Assess the risk of overfitting
+result <- check_overfitting(yi, vi, mods, B = 500) # Use B=500+ for stable results
+print(result)
+```
+
+In this example, even though the moderators were purely random noise, the **Apparent $R^2$** might be surprisingly high. The **Corrected $R^2$** correctly shrinks this towards zero.
+
+## Understanding the Risk Categories
+
+`metaoverfit` classifies the risk of overfitting based on the $k/p$ ratio and the observed optimism:
+
+- **Low Risk:** $k/p \ge 15$. Results are generally stable.
+- **Moderate Risk:** $k/p \approx 10-15$. Results should be reported with optimism correction.
+- **Severe/Extreme Risk:** $k/p < 10$. Results are highly unreliable and may be entirely due to overfitting.
+
+## Visualizing Overfitting
+
+You can visualize the difference between apparent and corrected $R^2$ using `plot_overfitting()`.
+
+```{r plotting, fig.width=7, fig.height=5}
+# Bar plot comparison
+plot_overfitting(result, type = "bar")
+
+# If cross-validation (r2het_cv) was run, you can see observed vs predicted
+cv_res <- r2het_cv(yi, vi, mods, verbose = FALSE)
+plot_overfitting(cv_res, type = "scatter")
+
+# Density plot of bootstrap distributions
+plot_overfitting(result, type = "density")
+```
+
+## Planning for Future Studies: Sample Size Guidance
+
+Before conducting a meta-regression, you can determine the minimum number of studies ($k$) required for a stable $R^2$ estimate using `sample_size_recommendation()`.
+
+```{r sample-size}
+# How many studies do I need for a model with 3 moderators (p=4)
+# to keep optimism below 10%?
+rec <- sample_size_recommendation(p = 4, target_optimism = 0.10)
+print(rec)
+```
+
+## Using the Formula Interface
+
+`metaoverfit` supports the standard R formula interface, making it compatible with `data.frame` objects.
+
+```{r formula}
+# Using the BCG vaccine dataset from metafor
+data(dat.bcg, package = "metadat")
+dat <- escalc(measure = "RR", ai = tpos, bi = tneg, 
+               ci = cpos, di = cneg, data = dat.bcg)
+
+# Check for overfitting in a model with ablat (latitude) and year
+fit_overfit <- check_overfitting(yi, vi, mods = ~ ablat + year, 
+                                 data = dat, B = 200)
+print(fit_overfit)
+```
+
+## Conclusion
+
+The `metaoverfit` package provides a necessary layer of protection against the over-interpretation of heterogeneity in meta-analysis. By reporting optimism-corrected $R^2$ values, researchers can provide more honest and reproducible evidence synthesis.

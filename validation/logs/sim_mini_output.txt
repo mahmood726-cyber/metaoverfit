@@ -1,0 +1,236 @@
+
+R version 4.5.2 (2025-10-31 ucrt) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # ============================================================================
+> # metaoverfit Mini Simulation Test - 10 Iterations (for quick verification)
+> # ============================================================================
+> # Ultra-fast version to verify the fix works before running longer simulations
+> # ============================================================================
+> 
+> # Set library path for data.table
+> .libPaths("C:/Users/user/AppData/Local/R/win-library/4.5")
+> 
+> # Load required packages
+> library(metafor)
+Loading required package: Matrix
+Loading required package: metadat
+Loading required package: numDeriv
+
+Loading the 'metafor' package (version 4.8-0). For an
+introduction to the package please type: help(metafor)
+
+> library(data.table)
+> 
+> # Load metaoverfit from source (not installed as a package)
+> setwd("C:/Users/user/OneDrive - NHS/Documents/metaoverfit")
+> devtools::load_all(".")
+ℹ Loading metaoverfit
+> 
+> # Set seed
+> set.seed(12345)
+> 
+> # Mini configuration
+> N_SIM <- 10  # Very small test
+> OUTPUT_DIR <- "C:/Users/user/OneDrive - NHS/Documents/metaoverfit/validation/simulation_results"
+> 
+> # Create output directory
+> dir.create(OUTPUT_DIR, showWarnings = FALSE, recursive = TRUE)
+> 
+> # ============================================================================
+> # Test Scenarios (Edge Cases)
+> # ============================================================================
+> 
+> test_scenarios <- data.frame(
++   scenario_id = 1:4,
++   k = c(5, 10, 20, 30),
++   p = c(2, 2, 2, 2),
++   tau2 = c(0.05, 0.05, 0, 0.05),
++   beta_mod = c(0.3, 0.3, 0.3, 0.3)
++ )
+> 
+> cat("Mini Test Scenarios:\n")
+Mini Test Scenarios:
+> print(test_scenarios)
+  scenario_id  k p tau2 beta_mod
+1           1  5 2 0.05      0.3
+2           2 10 2 0.05      0.3
+3           3 20 2 0.00      0.3
+4           4 30 2 0.05      0.3
+> 
+> # ============================================================================
+> # Helper Functions
+> # ============================================================================
+> 
+> generate_sim_data <- function(k, tau2, beta_mod, p) {
++   vi <- runif(k, 0.01, 0.1)
++ 
++   if (p == 2) {
++     mods <- cbind(1, rnorm(k, 0, 1))
++     beta <- c(0, beta_mod)
++   } else {
++     mods <- cbind(1, rnorm(k, 0, 1), rnorm(k, 0, 1))
++     beta <- c(0, beta_mod, 0)
++   }
++ 
++   ui <- rnorm(k, 0, sqrt(tau2))
++   yi <- mods %*% beta + ui + rnorm(k, 0, sqrt(vi))
++ 
++   list(yi = as.vector(yi), vi = vi, mods = mods,
++        true_tau2 = tau2, true_beta_mod = beta_mod)
++ }
+> 
+> run_single_sim <- function(sim_data) {
++   tryCatch({
++     check <- suppressWarnings(check_overfitting(
++       yi = sim_data$yi, vi = sim_data$vi, mods = sim_data$mods,
++       B = 25  # Fewer bootstrap iterations for speed
++     ))
++ 
++     data.frame(
++       k = length(sim_data$yi),
++       p = ncol(sim_data$mods),
++       tau2_true = sim_data$true_tau2,
++       beta_mod_true = sim_data$true_beta_mod,
++       r2_apparent = check$r2het_apparent / 100,
++       r2_corrected = check$r2het_corrected / 100,
++       optimism = check$actual_optimism / 100,
++       convergence = check$convergence_rate,
++       risk_category = check$risk_category,
++       k_per_p = check$k_per_p,
++       status = "success"
++     )
++   }, error = function(e) {
++     data.frame(
++       k = length(sim_data$yi), p = ncol(sim_data$mods),
++       tau2_true = sim_data$true_tau2, beta_mod_true = sim_data$true_beta_mod,
++       r2_apparent = NA_real_, r2_corrected = NA_real_, optimism = NA_real_,
++       convergence = NA_real_, risk_category = NA_character_,
++       k_per_p = NA_real_, status = "error"
++     )
++   })
++ }
+> 
+> # ============================================================================
+> # Run Mini Test
+> # ============================================================================
+> 
+> cat("\n========================================\n")
+
+========================================
+> cat("METAOVERFIT MINI SIMULATION TEST\n")
+METAOVERFIT MINI SIMULATION TEST
+> cat("========================================\n\n")
+========================================
+
+> cat(sprintf("Scenarios: %d\n", nrow(test_scenarios)))
+Scenarios: 4
+> cat(sprintf("Iterations per scenario: %d\n", N_SIM))
+Iterations per scenario: 10
+> cat(sprintf("Total simulations: %d\n\n", nrow(test_scenarios) * N_SIM))
+Total simulations: 40
+
+> 
+> all_results <- list()
+> 
+> for (s in 1:nrow(test_scenarios)) {
++   scenario <- test_scenarios[s, ]
++   cat(sprintf("Scenario %d: k=%d, p=%d, tau²=%.2f, beta=%.1f\n",
++               s, scenario$k, scenario$p, scenario$tau2, scenario$beta_mod))
++ 
++   scenario_results <- vector("list", N_SIM)
++ 
++   for (i in 1:N_SIM) {
++     sim_data <- generate_sim_data(scenario$k, scenario$tau2,
++                                    scenario$beta_mod, scenario$p)
++     scenario_results[[i]] <- run_single_sim(sim_data)
++   }
++ 
++   scenario_df <- rbindlist(scenario_results)
++   scenario_df$scenario_id <- s
++   all_results[[s]] <- scenario_df
++ }
+Scenario 1: k=5, p=2, tau²=0.05, beta=0.3
+Scenario 2: k=10, p=2, tau²=0.05, beta=0.3
+Scenario 3: k=20, p=2, tau²=0.00, beta=0.3
+Scenario 4: k=30, p=2, tau²=0.05, beta=0.3
+> 
+> final_results <- rbindlist(all_results)
+> 
+> # ============================================================================
+> # Summary
+> # ============================================================================
+> 
+> cat("\n=== MINI TEST RESULTS ===\n\n")
+
+=== MINI TEST RESULTS ===
+
+> 
+> success_rate <- mean(final_results$status == "success") * 100
+> cat(sprintf("Success rate: %.1f%%\n\n", success_rate))
+Success rate: 100.0%
+
+> 
+> success_results <- final_results[final_results$status == "success", ]
+> 
+> if (nrow(success_results) > 0) {
++   # Sanity checks
++   cat("Sanity Checks:\n")
++   cat(sprintf("  Corrected R² <= Apparent R²: %.1f%%\n",
++               mean(success_results$r2_corrected <= success_results$r2_apparent, na.rm = TRUE) * 100))
++   cat(sprintf("  Optimism >= 0: %.1f%%\n",
++               mean(success_results$optimism >= 0, na.rm = TRUE) * 100))
++   cat(sprintf("  R² in [0, 1]: %.1f%%\n\n",
++               mean(success_results$r2_apparent >= 0 & success_results$r2_apparent <= 1, na.rm = TRUE) * 100))
++ 
++   # Summary by scenario
++   cat("Results by Scenario:\n")
++   summary_by_scen <- success_results[, .(
++     n_sims = .N,
++     mean_optimism = mean(optimism, na.rm = TRUE) * 100,
++     mean_convergence = mean(convergence, na.rm = TRUE)
++   ), by = .(scenario_id, k, p, k_per_p)]
++   print(summary_by_scen)
++ }
+Sanity Checks:
+  Corrected R² <= Apparent R²: 100.0%
+  Optimism >= 0: 100.0%
+  R² in [0, 1]: 100.0%
+
+Results by Scenario:
+   scenario_id     k     p k_per_p n_sims mean_optimism mean_convergence
+         <int> <int> <int>   <num>  <int>         <num>            <num>
+1:           1     5     2     2.5     10         22.17              100
+2:           2    10     2     5.0     10         28.23              100
+3:           3    20     2    10.0     10         31.24              100
+4:           4    30     2    15.0     10         23.34              100
+> 
+> # Save results
+> output_file <- file.path(OUTPUT_DIR, "mini_test_results.csv")
+> write.csv(final_results, output_file, row.names = FALSE)
+> cat(sprintf("\nResults saved to: %s\n", output_file))
+
+Results saved to: C:/Users/user/OneDrive - NHS/Documents/metaoverfit/validation/simulation_results/mini_test_results.csv
+> 
+> cat("\nMini test complete!\n")
+
+Mini test complete!
+> 
+> proc.time()
+   user  system elapsed 
+ 442.95   16.48  464.70 

@@ -1,7 +1,0 @@
-{
-    "installOptions": {
-        "installFromRepository": true,
-        "libraryPath": "C:/Users/user/AppData/Local/R/cache/R/renv/library/metaoverfit-21a67a77/windows/R-4.5/x86_64-w64-mingw32",
-        "installDependencies": true
-    }
-}

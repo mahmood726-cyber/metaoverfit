@@ -28,14 +28,17 @@ if (getRversion() >= "2.15.1") {
 #' @param data Optional data frame (required if `mods` is a formula).
 #' @param method Heterogeneity estimator (default: "REML").
 #'
-#' @return A list with elements:
+#' @return A list with class "r2het" containing:
 #' \itemize{
-#'   \item \code{r2het} Apparent R^2_het.
-#'   \item \code{r2het_adj} Adjusted R^2_het with small-sample penalty.
-#'   \item \code{tau2_null}, \code{tau2_full} Estimated tau^2 from null and full models.
-#'   \item \code{I2} I^2 from the null model.
-#'   \item \code{k}, \code{p} Number of studies and parameters.
-#'   \item \code{model_null}, \code{model_full} \code{metafor::rma} fits.
+#'   \item \code{r2het} Apparent R^2_het (numeric).
+#'   \item \code{r2het_adj} Adjusted R^2_het with small-sample penalty (numeric).
+#'   \item \code{tau2_null} Estimated tau^2 from null model (numeric).
+#'   \item \code{tau2_full} Estimated tau^2 from full model (numeric).
+#'   \item \code{I2} I^2 from the null model (numeric).
+#'   \item \code{k} Number of studies (integer).
+#'   \item \code{p} Number of parameters (integer).
+#'   \item \code{model_null} \code{metafor::rma} fit for null model.
+#'   \item \code{model_full} \code{metafor::rma} fit for full model.
 #' }
 #' @export
 #'
@@ -50,10 +53,24 @@ r2het <- function(yi, vi, mods = NULL, data = NULL, method = "REML") {
     stop("yi and vi must have the same length")
   }
 
+  k <- length(yi)
+
+  # Validate sample size
+  if (k < 5) {
+    warning("Fewer than 5 studies - R²_het estimates are highly unreliable")
+  } else if (k < 10) {
+    warning("Fewer than 10 studies - R²_het estimates should be interpreted with caution")
+  }
+
   # Fit null model
   fit_null <- metafor::rma(yi = yi, vi = vi, data = data, method = method)
   tau2_null <- fit_null$tau2
   I2 <- fit_null$I2
+
+  # Warn if tau² is at boundary
+  if (tau2_null == 0) {
+    warning("Null model τ² = 0 (heterogeneity estimate at boundary); R²_het may be unreliable")
+  }
 
   # If no moderators, return trivial
   if (is.null(mods)) {
@@ -82,14 +99,18 @@ r2het <- function(yi, vi, mods = NULL, data = NULL, method = "REML") {
 
   tau2_full <- fit_full$tau2
 
+  # Warn if tau² is at boundary in full model
+  if (tau2_full < 1e-10 && tau2_null > 1e-10) {
+    warning("Full model τ² = 0; may indicate overfitting or insufficient heterogeneity")
+  }
+
   # Apparent R^2_het
   r2het_val <- if (tau2_null > 0) max(0, 1 - tau2_full / tau2_null) else 0
 
   # Adjusted R^2_het
-  k <- length(yi)
   r2het_adj <- if (tau2_null > 0 && k > p) max(0, 1 - (tau2_full / tau2_null) * ((k - 1) / (k - p))) else 0
 
-  list(
+  result <- list(
     r2het = r2het_val,
     r2het_adj = r2het_adj,
     tau2_null = tau2_null,
@@ -100,6 +121,8 @@ r2het <- function(yi, vi, mods = NULL, data = NULL, method = "REML") {
     model_null = fit_null,
     model_full = fit_full
   )
+  class(result) <- c("r2het", "list")
+  result
 }
 
 #' Cross-Validated R-squared for Heterogeneity
@@ -113,16 +136,31 @@ r2het <- function(yi, vi, mods = NULL, data = NULL, method = "REML") {
 #' @param k_folds Number of folds for k-fold CV (default: 5).
 #' @param verbose Show progress bar.
 #'
-#' @return List containing apparent/corrected R^2_het, optimism, diagnostics, and predictions.
+#' @return A list with class "r2het_cv" containing:
+#' \itemize{
+#'   \item \code{r2het_apparent} Apparent R^2_het (numeric).
+#'   \item \code{r2het_corrected} Cross-validated R^2_het (numeric).
+#'   \item \code{optimism} Difference between apparent and corrected (numeric).
+#'   \item \code{tau2_null} Tau^2 from null model (numeric).
+#'   \item \code{tau2_cv} Cross-validated tau^2 estimate (numeric).
+#'   \item \code{convergence_rate} Percentage of successful CV folds (numeric).
+#'   \item \code{rmse} Root mean squared error of predictions (numeric).
+#'   \item \code{mae} Mean absolute error of predictions (numeric).
+#'   \item \code{correlation} Correlation between observed and predicted (numeric).
+#'   \item \code{predictions} Vector of cross-validated predictions.
+#'   \item \code{yi} Original effect sizes for reference.
+#' }
 #' @export
 #'
 #' @examples
+#' \donttest{
 #' k <- 30
 #' yi <- rnorm(k, 0, sqrt(0.1))
 #' vi <- runif(k, 0.01, 0.1)
 #' mods <- cbind(1, rnorm(k))
-#' result <- r2het_cv(yi, vi, mods)
+#' result <- r2het_cv(yi, vi, mods, verbose = FALSE)
 #' round(result$optimism * 100, 1)
+#' }
 r2het_cv <- function(yi, vi, mods = NULL, data = NULL, method = "REML",
                      cv_method = "loo", k_folds = 5, verbose = TRUE) {
   k <- length(yi)
@@ -232,7 +270,7 @@ r2het_cv <- function(yi, vi, mods = NULL, data = NULL, method = "REML",
 
   optimism <- if (!is.na(r2het_cv_val)) apparent$r2het - r2het_cv_val else NA_real_
 
-  list(
+  result <- list(
     r2het_apparent = apparent$r2het,
     r2het_corrected = r2het_cv_val,
     optimism = optimism,
@@ -245,6 +283,8 @@ r2het_cv <- function(yi, vi, mods = NULL, data = NULL, method = "REML",
     predictions = if (sum(valid) > 0) yhat_cv else NULL,
     yi = yi
   )
+  class(result) <- c("r2het_cv", "list")
+  result
 }
 
 #' Bootstrap Confidence Intervals for R-squared
@@ -255,59 +295,159 @@ r2het_cv <- function(yi, vi, mods = NULL, data = NULL, method = "REML",
 #' @param data Optional data frame.
 #' @param method Heterogeneity estimator.
 #' @param B Number of bootstrap samples (default: 1000).
-#' @param conf_level Confidence level (default: 0.95).
-#' @param verbose Show progress.
+#' @param alpha Significance level for CIs (default: 0.05).
+#' @param verbose Show progress bar.
+#' @param parallel Logical. Use parallel processing? (default: FALSE).
+#' @param n_cores Number of cores to use. If NULL, uses detectCores() - 1.
 #'
-#' @return List with confidence intervals and diagnostics.
+#' @return A list with class "r2het_boot" containing:
+#' \itemize{
+#'   \item \code{ci_apparent} Bootstrap CI for apparent R^2_het (numeric vector of length 2).
+#'   \item \code{ci_corrected} Bootstrap CI for corrected R^2_het (numeric vector of length 2).
+#'   \item \code{mean_apparent} Bootstrap mean of apparent R^2_het (numeric).
+#'   \item \code{mean_corrected} Bootstrap mean of corrected R^2_het (numeric).
+#'   \item \code{se_apparent} Bootstrap SE of apparent R^2_het (numeric).
+#'   \item \code{se_corrected} Bootstrap SE of corrected R^2_het (numeric).
+#'   \item \code{prop_at_zero} Proportion of bootstrap samples with R^2_het < 0.01 (numeric).
+#'   \item \code{convergence} Percentage of successful bootstrap samples (numeric).
+#'   \item \code{bootstrap_values} List with vectors of bootstrap values for apparent and corrected.
+#' }
 #' @export
+#'
+#' @examples
+#' # Note: Bootstrap with B=50 for quick demonstration.
+#' # In practice, use B >= 500 for stable results.
+#' k <- 30
+#' yi <- rnorm(k, 0, sqrt(0.1))
+#' vi <- runif(k, 0.01, 0.1)
+#' mods <- cbind(1, rnorm(k))
+#' boot_result <- r2het_boot(yi, vi, mods, B = 50, verbose = FALSE)
 r2het_boot <- function(yi, vi, mods = NULL, data = NULL, method = "REML",
-                       B = 1000, conf_level = 0.95, verbose = TRUE) {
-  k <- length(yi)
-  alpha <- 1 - conf_level
-
-  r2het_ap_vec <- rep(NA_real_, B)
-  r2het_cv_vec <- rep(NA_real_, B)
-
-  if (verbose) pb <- txtProgressBar(min = 0, max = B, style = 3)
-
-  for (b in seq_len(B)) {
-    idx <- sample(seq_len(k), k, replace = TRUE)
-    yi_b <- yi[idx]
-    vi_b <- vi[idx]
-
-    # Prepare bootstrapped mods/data
-    mods_b <- NULL
-    data_b <- NULL
-    has_matrix_mods <- !is.null(mods) && inherits(mods, "matrix")
-    has_formula_mods <- !is.null(mods) && inherits(mods, "formula")
-
-    if (has_matrix_mods) {
-      mods_b <- mods[idx, , drop = FALSE]
-    } else if (has_formula_mods) {
-      if (is.null(data)) stop("When 'mods' is a formula, 'data' must be provided.")
-      data_b <- data[idx, , drop = FALSE]
-    }
-
-    # Compute CV in bootstrap sample
-    tryCatch({
-      if (is.null(mods)) {
-        res <- r2het_cv(yi_b, vi_b, mods = NULL, data = NULL, method = method,
-                        cv_method = "loo", verbose = FALSE)
-      } else if (has_formula_mods) {
-        res <- r2het_cv(yi_b, vi_b, mods, data_b, method, cv_method = "loo", verbose = FALSE)
-      } else {
-        res <- r2het_cv(yi_b, vi_b, mods_b, NULL, method, cv_method = "loo", verbose = FALSE)
-      }
-      r2het_ap_vec[b] <- res$r2het_apparent
-      r2het_cv_vec[b] <- res$r2het_corrected
-    }, error = function(e) {
-      # leave NA on failure
-    })
-
-    if (verbose) setTxtProgressBar(pb, b)
+                       B = 1000, alpha = 0.05, verbose = TRUE,
+                       parallel = FALSE, n_cores = NULL) {
+  if (is.null(mods)) {
+    return(list(
+      ci_apparent = c(0, 0),
+      ci_corrected = c(0, 0),
+      mean_apparent = 0,
+      mean_corrected = 0,
+      se_apparent = 0,
+      se_corrected = 0,
+      prop_at_zero = 1,
+      convergence = 100,
+      bootstrap_values = list(apparent = numeric(0), corrected = numeric(0))
+    ))
   }
 
-  if (verbose) close(pb)
+  k <- length(yi)
+  r2het_ap_vec <- numeric(B)
+  r2het_cv_vec <- numeric(B)
+
+  if (parallel) {
+    if (!requireNamespace("parallel", quietly = TRUE) ||
+        !requireNamespace("doParallel", quietly = TRUE) ||
+        !requireNamespace("foreach", quietly = TRUE)) {
+      warning("Parallel packages not installed. Falling back to sequential execution.")
+      parallel <- FALSE
+    }
+  }
+
+  if (parallel) {
+    if (is.null(n_cores)) {
+      n_cores <- max(1, parallel::detectCores() - 1)
+    }
+
+    cl <- parallel::makeCluster(n_cores)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    doParallel::registerDoParallel(cl)
+
+    if (verbose) message(sprintf("Running bootstrap on %d cores...", n_cores))
+
+    # Explicitly import %dopar% operator
+    `%dopar%` <- foreach::`%dopar%`
+    
+    # We use 'b' as iterator
+    # We export the functions explicitly to ensure they are available even if package not installed
+    results <- foreach::foreach(b = seq_len(B), 
+                                .packages = c("metafor", "stats"),
+                                .export = c("r2het", "r2het_cv")) %dopar% {
+      idx_boot <- sample(seq_len(k), k, replace = TRUE)
+      yi_boot <- yi[idx_boot]
+      vi_boot <- vi[idx_boot]
+      
+      ap_val <- NA_real_
+      cv_val <- NA_real_
+
+      if (inherits(mods, "formula")) {
+        if (!is.null(data)) {
+          data_boot <- data[idx_boot, , drop = FALSE]
+          tryCatch({
+            ap <- r2het(yi_boot, vi_boot, mods, data_boot, method)
+            cv <- r2het_cv(yi_boot, vi_boot, mods, data_boot, method, verbose = FALSE)
+            ap_val <- ap$r2het
+            cv_val <- cv$r2het_corrected
+          }, error = function(e) {})
+        }
+      } else {
+        mods_boot <- mods[idx_boot, , drop = FALSE]
+        tryCatch({
+          ap <- r2het(yi_boot, vi_boot, mods_boot, data = NULL, method)
+          cv <- r2het_cv(yi_boot, vi_boot, mods_boot, data = NULL, method, verbose = FALSE)
+          ap_val <- ap$r2het
+          cv_val <- cv$r2het_corrected
+        }, error = function(e) {})
+      }
+      
+      list(apparent = ap_val, corrected = cv_val)
+    }
+    
+    # Unpack results
+    r2het_ap_vec <- sapply(results, function(x) x$apparent)
+    r2het_cv_vec <- sapply(results, function(x) x$corrected)
+
+  } else {
+    # Sequential execution
+    if (verbose) pb <- txtProgressBar(min = 0, max = B, style = 3)
+
+    for (b in seq_len(B)) {
+      idx_boot <- sample(seq_len(k), k, replace = TRUE)
+      yi_boot <- yi[idx_boot]
+      vi_boot <- vi[idx_boot]
+
+      if (inherits(mods, "formula")) {
+        if (is.null(data)) {
+          r2het_ap_vec[b] <- NA_real_
+          r2het_cv_vec[b] <- NA_real_
+        } else {
+          data_boot <- data[idx_boot, , drop = FALSE]
+          tryCatch({
+            ap <- r2het(yi_boot, vi_boot, mods, data_boot, method)
+            cv <- r2het_cv(yi_boot, vi_boot, mods, data_boot, method, verbose = FALSE)
+            r2het_ap_vec[b] <- ap$r2het
+            r2het_cv_vec[b] <- cv$r2het_corrected
+          }, error = function(e) {
+            r2het_ap_vec[b] <- NA_real_
+            r2het_cv_vec[b] <- NA_real_
+          })
+        }
+      } else {
+        mods_boot <- mods[idx_boot, , drop = FALSE]
+        tryCatch({
+          ap <- r2het(yi_boot, vi_boot, mods_boot, data = NULL, method)
+          cv <- r2het_cv(yi_boot, vi_boot, mods_boot, data = NULL, method, verbose = FALSE)
+          r2het_ap_vec[b] <- ap$r2het
+          r2het_cv_vec[b] <- cv$r2het_corrected
+        }, error = function(e) {
+          r2het_ap_vec[b] <- NA_real_
+          r2het_cv_vec[b] <- NA_real_
+        })
+      }
+
+      if (verbose) setTxtProgressBar(pb, b)
+    }
+
+    if (verbose) close(pb)
+  }
 
   r2het_ap_vec <- r2het_ap_vec[!is.na(r2het_ap_vec)]
   r2het_cv_vec <- r2het_cv_vec[!is.na(r2het_cv_vec)]
@@ -355,11 +495,37 @@ r2het_boot <- function(yi, vi, mods = NULL, data = NULL, method = "REML",
 #' @param data Optional data frame.
 #' @param method Heterogeneity estimator.
 #' @param B Number of bootstrap samples.
+#' @param parallel Logical. Use parallel processing? (default: FALSE).
+#' @param n_cores Number of cores to use. If NULL, uses detectCores() - 1.
 #'
-#' @return A list (class "metaoverfit") summarizing overfitting risk and metrics.
+#' @return An object of class "metaoverfit" (a list) containing:
+#' \itemize{
+#'   \item \code{k} Number of studies (integer).
+#'   \item \code{p} Number of parameters (integer).
+#'   \item \code{k_per_p} Ratio of studies to parameters (numeric).
+#'   \item \code{risk_category} Overfitting risk level: "None", "Low", "Moderate", "Severe", or "Extreme" (character).
+#'   \item \code{expected_optimism} Expected range of optimism (character).
+#'   \item \code{actual_optimism} Actual optimism percentage (numeric).
+#'   \item \code{r2het_apparent} Apparent R^2_het percentage (numeric).
+#'   \item \code{r2het_corrected} Corrected R^2_het percentage (numeric).
+#'   \item \code{ci_corrected} 95% CI for corrected R^2_het (numeric vector).
+#'   \item \code{recommendation} Text recommendation based on results (character).
+#'   \item \code{convergence_rate} Percentage of successful CV folds (numeric).
+#'   \item \code{bootstrap_values} List with vectors of bootstrap values for apparent and corrected.
+#' }
+#' @examples
+#' \donttest{
+#' # BCG vaccine data
+#' data(dat.bcg, package = "metadat")
+#' dat <- metafor::escalc(measure = "RR", ai = tpos, bi = tneg,
+#'                        ci = cpos, di = cneg, data = dat.bcg)
+#' result <- check_overfitting(dat$yi, dat$vi, mods = ~ ablat, data = dat, B = 50)
+#' print(result)
+#' }
 #' @export
 check_overfitting <- function(yi, vi, mods = NULL, data = NULL,
-                              method = "REML", B = 500) {
+                              method = "REML", B = 500,
+                              parallel = FALSE, n_cores = NULL) {
   k <- length(yi)
 
   if (is.null(mods)) {
@@ -374,7 +540,8 @@ check_overfitting <- function(yi, vi, mods = NULL, data = NULL,
       r2het_corrected = 0,
       ci_corrected = c(NA_real_, NA_real_),
       recommendation = "No moderators - no overfitting risk",
-      convergence_rate = 100
+      convergence_rate = 100,
+      bootstrap_values = list(apparent = numeric(0), corrected = numeric(0))
     )
     class(rpt) <- c("metaoverfit", "list")
     return(rpt)
@@ -412,7 +579,8 @@ check_overfitting <- function(yi, vi, mods = NULL, data = NULL,
   }
 
   cv_result <- r2het_cv(yi, vi, mods, data, method, verbose = FALSE)
-  boot_result <- r2het_boot(yi, vi, mods, data, method, B = B, verbose = FALSE)
+  boot_result <- r2het_boot(yi, vi, mods, data, method, B = B, verbose = FALSE,
+                            parallel = parallel, n_cores = n_cores)
 
   rpt <- list(
     k = k,
@@ -425,7 +593,8 @@ check_overfitting <- function(yi, vi, mods = NULL, data = NULL,
     r2het_corrected = round(cv_result$r2het_corrected * 100, 1),
     ci_corrected = round(boot_result$ci_corrected * 100, 1),
     recommendation = recommendation,
-    convergence_rate = cv_result$convergence_rate
+    convergence_rate = cv_result$convergence_rate,
+    bootstrap_values = boot_result$bootstrap_values
   )
   class(rpt) <- c("metaoverfit", "list")
   rpt
@@ -433,12 +602,27 @@ check_overfitting <- function(yi, vi, mods = NULL, data = NULL,
 
 #' Sample Size Recommendation for Meta-Regression
 #'
+#' Calculates the minimum required number of studies for a meta-regression
+#' analysis based on the number of parameters and target optimism level.
+#'
 #' @param p Number of parameters (including intercept).
 #' @param target_optimism Maximum acceptable optimism (default: 0.10).
+#' @param verbose Logical. If TRUE (default), prints recommendation to console.
 #'
-#' @return Invisibly returns the minimum required k; prints a small report.
+#' @return An object of class "sample_size_rec" (a list) containing:
+#' \itemize{
+#'   \item \code{p} Number of parameters (integer).
+#'   \item \code{target_optimism} Target optimism level (numeric).
+#'   \item \code{min_ratio} Minimum k/p ratio required (integer).
+#'   \item \code{min_k} Minimum number of studies required (integer).
+#' }
+#' The object is returned invisibly. When printed, it displays a formatted
+#' recommendation summary.
+#' @examples
+#' # Minimum studies for 3-predictor model
+#' sample_size_recommendation(p = 3, target_optimism = 0.10)
 #' @export
-sample_size_recommendation <- function(p, target_optimism = 0.10) {
+sample_size_recommendation <- function(p, target_optimism = 0.10, verbose = TRUE) {
   if (target_optimism <= 0.05) {
     min_ratio <- 20
   } else if (target_optimism <= 0.10) {
@@ -451,56 +635,92 @@ sample_size_recommendation <- function(p, target_optimism = 0.10) {
 
   min_k <- max(20, ceiling(p * min_ratio))
 
-  cat("Sample Size Recommendation\n")
-  cat(strrep("-", 40), "\n")
-  cat("Parameters (p):", p, "\n")
-  cat("Target optimism:", target_optimism * 100, "%\n")
-  cat("Minimum k/p ratio:", min_ratio, "\n")
-  cat("MINIMUM k required:", min_k, "\n")
-  cat("\nNote: This ensures optimism <", target_optimism * 100, "%\n")
+  result <- list(
+    p = p,
+    target_optimism = target_optimism,
+    min_ratio = min_ratio,
+    min_k = min_k
+  )
 
-  invisible(min_k)
+  class(result) <- c("sample_size_rec", "list")
+
+  if (verbose) {
+    print(result)
+  }
+
+  invisible(result)
+}
+
+#' Print Method for sample_size_rec Objects
+#'
+#' @param x A sample_size_rec object.
+#' @param ... Additional arguments (unused).
+#'
+#' @return No return value, called for side effects (printing to console).
+#' @export
+print.sample_size_rec <- function(x, ...) {
+  message("Sample Size Recommendation")
+  message(strrep("-", 40))
+  message("Parameters (p): ", x$p)
+  message("Target optimism: ", x$target_optimism * 100, "%")
+  message("Minimum k/p ratio: ", x$min_ratio)
+  message("MINIMUM k required: ", x$min_k)
+  message("\nNote: This ensures optimism < ", x$target_optimism * 100, "%")
 }
 
 #' Print Method for metaoverfit Objects
 #'
-#' @param x metaoverfit object.
+#' @param x A metaoverfit object.
 #' @param ... Additional arguments (unused).
 #'
+#' @return No return value, called for side effects (printing to console).
 #' @export
 print.metaoverfit <- function(x, ...) {
-  cat("\n", strrep("=", 60), "\n")
-  cat("META-REGRESSION OVERFITTING ASSESSMENT\n")
-  cat(strrep("=", 60), "\n\n")
+  message("\n", strrep("=", 60))
+  message("META-REGRESSION OVERFITTING ASSESSMENT")
+  message(strrep("=", 60), "\n")
 
-  cat("Sample Size:\n")
-  cat("  k =", x$k, "studies\n")
-  cat("  p =", x$p, "parameters\n")
-  cat("  k/p ratio =", x$k_per_p, "\n\n")
+  message("Sample Size:")
+  message("  k = ", x$k, " studies")
+  message("  p = ", x$p, " parameters")
+  message("  k/p ratio = ", x$k_per_p, "\n")
 
-  cat("Risk Assessment:\n")
-  cat("  Category:", x$risk_category, "\n")
-  cat("  Expected optimism:", x$expected_optimism, "\n")
-  cat("  Actual optimism:", x$actual_optimism, "%\n\n")
+  message("Risk Assessment:")
+  message("  Category: ", x$risk_category)
+  message("  Expected optimism: ", x$expected_optimism)
+  message("  Actual optimism: ", x$actual_optimism, "%")
+  message("  CV convergence: ", x$convergence_rate, "%\n")
 
-  cat("R^2 for Heterogeneity:\n")
-  cat("  Apparent R^2_het:", x$r2het_apparent, "%\n")
-  cat("  Corrected R^2_het:", x$r2het_corrected, "%\n")
-  cat("  95% CI:", paste0("[", x$ci_corrected[1], "%, ",
-                          x$ci_corrected[2], "%]"), "\n\n")
+  message("R^2 for Heterogeneity:")
+  message("  Apparent R^2_het: ", x$r2het_apparent, "%")
+  message("  Corrected R^2_het: ", x$r2het_corrected, "%")
+  message("  95% CI: [", x$ci_corrected[1], "%, ",
+          x$ci_corrected[2], "%]\n")
 
-  cat("RECOMMENDATION:\n")
-  cat("  ", x$recommendation, "\n")
-  cat("\n", strrep("=", 60), "\n")
+  message("RECOMMENDATION:")
+  message("  ", x$recommendation)
+  message("\n", strrep("=", 60))
 }
 
 #' Plot Overfitting Diagnostics
 #'
+#' Creates diagnostic plots for assessing overfitting in meta-regression.
+#'
 #' @param result Output from \code{check_overfitting()} or \code{r2het_cv()}.
 #' @param type "bar" for comparison of apparent vs corrected R^2_het,
-#'   or "scatter" for observed vs predicted (requires predictions).
+#'   "scatter" for observed vs predicted (requires predictions), or
+#'   "density" for bootstrap distributions (requires bootstrap_values).
 #'
-#' @return A ggplot object.
+#' @return A ggplot2 object. If ggplot2 is not installed, the function
+#'   will stop with an error message.
+#' @examples
+#' \donttest{
+#' data(dat.bcg, package = "metadat")
+#' dat <- metafor::escalc(measure = "RR", ai = tpos, bi = tneg,
+#'                        ci = cpos, di = cneg, data = dat.bcg)
+#' cv <- r2het_cv(dat$yi, dat$vi, mods = ~ ablat, data = dat)
+#' plot_overfitting(cv, type = "bar")
+#' }
 #' @export
 plot_overfitting <- function(result, type = "bar") {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
@@ -508,10 +728,17 @@ plot_overfitting <- function(result, type = "bar") {
   }
 
   if (type == "bar") {
+    # Detect scale: check_overfitting() stores values as percentages (>1),
+    # while r2het_cv()/r2het_boot() store on 0-1 scale
+    app_val <- result$r2het_apparent
+    cor_val <- result$r2het_corrected
+    if (!is.null(app_val) && !is.na(app_val) && app_val <= 1) {
+      app_val <- app_val * 100
+      cor_val <- cor_val * 100
+    }
     df <- data.frame(
       Type  = c("Apparent", "Corrected"),
-      R2het = c(result$r2het_apparent * 100,
-                result$r2het_corrected * 100)
+      R2het = c(app_val, cor_val)
     )
 
     p <- ggplot2::ggplot(df, ggplot2::aes(x = Type, y = R2het, fill = Type)) +
@@ -523,7 +750,7 @@ plot_overfitting <- function(result, type = "bar") {
         title = "Overfitting in Meta-Regression",
         subtitle = paste(
           "Optimism:",
-          round((result$r2het_apparent - result$r2het_corrected) * 100, 1), "%"
+          round(app_val - cor_val, 1), "%"
         )
       ) +
       ggplot2::theme_minimal() +
@@ -553,8 +780,35 @@ plot_overfitting <- function(result, type = "bar") {
         subtitle = paste("Correlation:", round(result$correlation, 3))
       ) +
       ggplot2::theme_minimal()
+      
+  } else if (type == "density") {
+    if (is.null(result$bootstrap_values) || 
+        length(result$bootstrap_values$apparent) == 0) {
+      stop("No bootstrap values available in 'result' to draw density plot.")
+    }
+    
+    df_boot <- data.frame(
+      Value = c(result$bootstrap_values$apparent, 
+                result$bootstrap_values$corrected),
+      Type = rep(c("Apparent", "Corrected"), 
+                 each = length(result$bootstrap_values$apparent))
+    )
+    
+    p <- ggplot2::ggplot(df_boot, ggplot2::aes(x = Value * 100, fill = Type)) +
+      ggplot2::geom_density(alpha = 0.5) +
+      ggplot2::scale_fill_manual(values = c("Apparent" = "#E74C3C",
+                                            "Corrected" = "#27AE60")) +
+      ggplot2::labs(
+        x = "R^2_het (%)",
+        y = "Density",
+        title = "Bootstrap Distributions of R^2_het",
+        subtitle = "Comparison of Apparent and Optimism-Corrected Estimates"
+      ) +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(legend.position = "top")
+      
   } else {
-    stop("type must be 'bar' or 'scatter'.")
+    stop("type must be 'bar', 'scatter', or 'density'.")
   }
 
   p

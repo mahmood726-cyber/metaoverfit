@@ -11,8 +11,10 @@ r2het_boot(
   data = NULL,
   method = "REML",
   B = 1000,
-  conf_level = 0.95,
-  verbose = TRUE
+  alpha = 0.05,
+  verbose = TRUE,
+  parallel = FALSE,
+  n_cores = NULL
 )
 }
 \arguments{
@@ -28,13 +30,37 @@ r2het_boot(
 
 \item{B}{Number of bootstrap samples (default: 1000).}
 
-\item{conf_level}{Confidence level (default: 0.95).}
+\item{alpha}{Significance level for CIs (default: 0.05).}
 
-\item{verbose}{Show progress.}
+\item{verbose}{Show progress bar.}
+
+\item{parallel}{Logical. Use parallel processing? (default: FALSE).}
+
+\item{n_cores}{Number of cores to use. If NULL, uses detectCores() - 1.}
 }
 \value{
-List with confidence intervals and diagnostics.
+A list with class "r2het_boot" containing:
+\itemize{
+  \item \code{ci_apparent} Bootstrap CI for apparent R^2_het (numeric vector of length 2).
+  \item \code{ci_corrected} Bootstrap CI for corrected R^2_het (numeric vector of length 2).
+  \item \code{mean_apparent} Bootstrap mean of apparent R^2_het (numeric).
+  \item \code{mean_corrected} Bootstrap mean of corrected R^2_het (numeric).
+  \item \code{se_apparent} Bootstrap SE of apparent R^2_het (numeric).
+  \item \code{se_corrected} Bootstrap SE of corrected R^2_het (numeric).
+  \item \code{prop_at_zero} Proportion of bootstrap samples with R^2_het < 0.01 (numeric).
+  \item \code{convergence} Percentage of successful bootstrap samples (numeric).
+  \item \code{bootstrap_values} List with vectors of bootstrap values for apparent and corrected.
+}
 }
 \description{
 Bootstrap Confidence Intervals for R-squared
+}
+\examples{
+# Note: Bootstrap with B=50 for quick demonstration.
+# In practice, use B >= 500 for stable results.
+k <- 30
+yi <- rnorm(k, 0, sqrt(0.1))
+vi <- runif(k, 0.01, 0.1)
+mods <- cbind(1, rnorm(k))
+boot_result <- r2het_boot(yi, vi, mods, B = 50, verbose = FALSE)
 }

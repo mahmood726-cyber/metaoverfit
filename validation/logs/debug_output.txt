@@ -1,0 +1,109 @@
+
+R version 4.5.2 (2025-10-31 ucrt) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # Debug script to find the actual error in simulation
+> 
+> .libPaths("C:/Users/user/AppData/Local/R/win-library/4.5")
+> 
+> # Load packages and metaoverfit from source
+> library(metafor)
+Loading required package: Matrix
+Loading required package: metadat
+Loading required package: numDeriv
+
+Loading the 'metafor' package (version 4.8-0). For an
+introduction to the package please type: help(metafor)
+
+> setwd("C:/Users/user/OneDrive - NHS/Documents/metaoverfit")
+> devtools::load_all(".")
+ℹ Loading metaoverfit
+> 
+> # Simple test case - same as scenario 1
+> set.seed(12345)
+> k <- 5
+> tau2 <- 0.05
+> beta_mod <- 0.3
+> p <- 2
+> 
+> # Generate data like the simulation
+> vi <- runif(k, 0.01, 0.1)
+> mods <- cbind(1, rnorm(k, 0, 1))
+> beta <- c(0, beta_mod)
+> ui <- rnorm(k, 0, sqrt(tau2))
+> yi <- mods %*% beta + ui + rnorm(k, 0, sqrt(vi))
+> 
+> cat("Data generated:\n")
+Data generated:
+> cat(sprintf("  yi: %s\n", paste(round(as.vector(yi), 4), collapse = ", ")))
+  yi: -0.3882, -0.0153, 1.0556, -1.1611, -0.6866
+> cat(sprintf("  vi: %s\n", paste(round(vi, 4), collapse = ", ")))
+  vi: 0.0749, 0.0888, 0.0785, 0.0898, 0.0511
+> cat(sprintf("  mods dimensions: %d x %d\n", nrow(mods), ncol(mods)))
+  mods dimensions: 5 x 2
+> 
+> # Try to run check_overfitting
+> cat("\nCalling check_overfitting...\n")
+
+Calling check_overfitting...
+> 
+> tryCatch({
++   result <- check_overfitting(
++     yi = as.vector(yi),
++     vi = vi,
++     mods = mods,
++     B = 50
++   )
++   cat("SUCCESS!\n")
++   print(result)
++ }, error = function(e) {
++   cat("ERROR:\n")
++   cat(sprintf("  Message: %s\n", e$message))
++   cat(sprintf("  Call: %s\n", deparse(e$call)))
++ })
+SUCCESS!
+
+============================================================
+META-REGRESSION OVERFITTING ASSESSMENT
+============================================================
+
+Sample Size:
+  k = 5 studies
+  p = 2 parameters
+  k/p ratio = 2.5
+
+Risk Assessment:
+  Category: Extreme
+  Expected optimism: >40%
+  Actual optimism: 67.4%
+  CV convergence: 100%
+
+R^2 for Heterogeneity:
+  Apparent R^2_het: 67.4%
+  Corrected R^2_het: 0%
+  95% CI: [0%, 100%]
+
+RECOMMENDATION:
+  DO NOT conduct meta-regression - sample size too small
+
+============================================================
+There were 50 or more warnings (use warnings() to see the first 50)
+> 
+> proc.time()
+   user  system elapsed 
+  13.82    0.70   14.93 

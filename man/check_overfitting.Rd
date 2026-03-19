@@ -4,7 +4,16 @@
 \alias{check_overfitting}
 \title{Check for Overfitting in Meta-Regression}
 \usage{
-check_overfitting(yi, vi, mods = NULL, data = NULL, method = "REML", B = 500)
+check_overfitting(
+  yi,
+  vi,
+  mods = NULL,
+  data = NULL,
+  method = "REML",
+  B = 500,
+  parallel = FALSE,
+  n_cores = NULL
+)
 }
 \arguments{
 \item{yi}{Vector of effect sizes.}
@@ -18,10 +27,38 @@ check_overfitting(yi, vi, mods = NULL, data = NULL, method = "REML", B = 500)
 \item{method}{Heterogeneity estimator.}
 
 \item{B}{Number of bootstrap samples.}
+
+\item{parallel}{Logical. Use parallel processing? (default: FALSE).}
+
+\item{n_cores}{Number of cores to use. If NULL, uses detectCores() - 1.}
 }
 \value{
-A list (class "metaoverfit") summarizing overfitting risk and metrics.
+An object of class "metaoverfit" (a list) containing:
+\itemize{
+  \item \code{k} Number of studies (integer).
+  \item \code{p} Number of parameters (integer).
+  \item \code{k_per_p} Ratio of studies to parameters (numeric).
+  \item \code{risk_category} Overfitting risk level: "None", "Low", "Moderate", "Severe", or "Extreme" (character).
+  \item \code{expected_optimism} Expected range of optimism (character).
+  \item \code{actual_optimism} Actual optimism percentage (numeric).
+  \item \code{r2het_apparent} Apparent R^2_het percentage (numeric).
+  \item \code{r2het_corrected} Corrected R^2_het percentage (numeric).
+  \item \code{ci_corrected} 95% CI for corrected R^2_het (numeric vector).
+  \item \code{recommendation} Text recommendation based on results (character).
+  \item \code{convergence_rate} Percentage of successful CV folds (numeric).
+  \item \code{bootstrap_values} List with vectors of bootstrap values for apparent and corrected.
+}
 }
 \description{
 Check for Overfitting in Meta-Regression
+}
+\examples{
+\donttest{
+# BCG vaccine data
+data(dat.bcg, package = "metadat")
+dat <- metafor::escalc(measure = "RR", ai = tpos, bi = tneg,
+                       ci = cpos, di = cneg, data = dat.bcg)
+result <- check_overfitting(dat$yi, dat$vi, mods = ~ ablat, data = dat, B = 50)
+print(result)
+}
 }
