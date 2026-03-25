@@ -6,7 +6,7 @@
 ² Tahir Heart Institute, Rabwah, Pakistan
 ³ Independent Researcher, London, UK
 
-**Corresponding author:** Mahmood Ahmad (mahmood726@gmail.com)
+**Corresponding author:** Mahmood Ahmad (mahmood.ahmad2@nhs.net)
 
 ## Abstract
 Meta-regression is widely used in systematic reviews to explore sources of heterogeneity between studies. However, the reliability of the proportion of heterogeneity explained (apparent $R^2_{het}$) is often compromised when the number of studies ($k$) is small relative to the number of moderators ($p$). In such cases, the apparent $R^2_{het}$ can be substantially inflated due to overfitting, leading to "false discoveries" of moderator effects. We present `metaoverfit`, an R package designed to detect and correct for overfitting in meta-regression. The package implements optimism-correction techniques through cross-validation (leave-one-out and $k$-fold) and bootstrap methods specifically tailored for random-effects meta-regression models. We validated `metaoverfit` using a comprehensive simulation study (12,000 iterations) and an empirical analysis of 501 Cochrane meta-analyses. Our results demonstrate that $R^2_{het}$ optimism is severe when the $k/p$ ratio is less than 10. `metaoverfit` provides researchers with automated risk assessments, optimism-corrected $R^2$ estimates, and bootstrap confidence intervals, ensuring more robust and reproducible evidence synthesis.
