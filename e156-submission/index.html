@@ -259,9 +259,9 @@ const D = {
   "doi": "",
   "protocol": "",
   "source_article": "",
-  "body": "Does overfitting inflate the apparent proportion of heterogeneity explained in published meta-regressions, and can cross-validation correct this distortion? We developed the metaoverfit R package implementing leave-one-out cross-validation of between-study variance and bootstrap optimism correction, built on metafor with parallel computation and automatic risk classification. The package exports six functions covering apparent and adjusted R-squared, LOOCV-corrected estimates, bootstrap confidence intervals with boundary diagnostics, audit reports, visualization, and sample-size guidance. Across 12,000 simulations the median optimism was 0.18, 95% CI 0.12-0.25, and apparent R-squared exceeded 50 percent under null models when the studies-to-predictors ratio fell below 5. Analysis of 501 Cochrane meta-analyses revealed over 30 percent had severe or extreme overfitting risk at the corrected threshold. Automated risk categorization assigns each analysis to one of four tiers based on ratio thresholds and observed shrinkage magnitude. A limitation is that cross-validation with fewer than ten studies may itself be unstable and should be interpreted cautiously.",
+  "body": "Does overfitting inflate the apparent proportion of heterogeneity explained in published meta-regressions, and can cross-validation correct this distortion? We developed the metaoverfit R package implementing leave-one-out cross-validation of between-study variance and bootstrap optimism correction, built on metafor with parallel computation and automatic risk classification. The package exports six functions covering apparent and adjusted R-squared, LOOCV-corrected estimates, bootstrap confidence intervals with boundary diagnostics, audit reports, visualization, and sample-size planning guidance. Across 12,000 simulations the median optimism was 0.18 (95% CI 0.12 to 0.25) and apparent R-squared exceeded 50 percent under null models when the studies-to-predictors ratio fell below five. Analysis of 501 Cochrane meta-analyses revealed that over 30 percent had severe or extreme overfitting risk at the corrected threshold. Automated risk categorization assigns each analysis to one of four tiers based on ratio thresholds and observed shrinkage magnitude. A limitation is that cross-validation with fewer than ten studies may itself be unstable and should be interpreted cautiously.",
   "validation": {
-    "status": "fail",
+    "status": "pass",
     "checks": [
       {
         "name": "single paragraph",
@@ -275,8 +275,8 @@ const D = {
       },
       {
         "name": "word count",
-        "ok": false,
-        "detail": "Found 152 words."
+        "ok": true,
+        "detail": "Found 156 words."
       },
       {
         "name": "no headings",
@@ -316,15 +316,15 @@ const D = {
     },
     {
       "role": "Method",
-      "text": "The package exports six functions covering apparent and adjusted R-squared, LOOCV-corrected estimates, bootstrap confidence intervals with boundary diagnostics, audit reports, visualization, and sample-size guidance."
+      "text": "The package exports six functions covering apparent and adjusted R-squared, LOOCV-corrected estimates, bootstrap confidence intervals with boundary diagnostics, audit reports, visualization, and sample-size planning guidance."
     },
     {
       "role": "Primary result",
-      "text": "Across 12,000 simulations the median optimism was 0.18, 95% CI 0.12-0.25, and apparent R-squared exceeded 50 percent under null models when the studies-to-predictors ratio fell below 5."
+      "text": "Across 12,000 simulations the median optimism was 0.18 (95% CI 0.12 to 0.25) and apparent R-squared exceeded 50 percent under null models when the studies-to-predictors ratio fell below five."
     },
     {
       "role": "Robustness",
-      "text": "Analysis of 501 Cochrane meta-analyses revealed over 30 percent had severe or extreme overfitting risk at the corrected threshold."
+      "text": "Analysis of 501 Cochrane meta-analyses revealed that over 30 percent had severe or extreme overfitting risk at the corrected threshold."
     },
     {
       "role": "Interpretation",
